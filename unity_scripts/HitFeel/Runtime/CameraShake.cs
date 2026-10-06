@@ -31,6 +31,11 @@ namespace EggGame.HitFeel
         private float _seed;
         private float _time;
 
+        // Внешняя добавка (например, покачивание от замаха). Собирается за кадр и сбрасывается.
+        private Vector3 _extraPos;
+        private Vector3 _extraEuler;
+        private bool _dirty;
+
         private void Awake()
         {
             _baseLocalPos = transform.localPosition;
@@ -47,6 +52,9 @@ namespace EggGame.HitFeel
         {
             if (Local == this) Local = null;
             _strength = 0f;
+            _extraPos = Vector3.zero;
+            _extraEuler = Vector3.zero;
+            _dirty = false;
             transform.localPosition = _baseLocalPos;
             transform.localRotation = _baseLocalRot;
         }
@@ -81,39 +89,58 @@ namespace EggGame.HitFeel
             _sideBias = Mathf.Clamp(parentSpace.x, -1f, 1f);
         }
 
+        // Добавка к позиции/повороту на ЭТОТ кадр (в локальных осях объекта).
+        // Вызывать каждый кадр из Update, пока нужна. Несколько вызовов складываются.
+        public void AddOffset(Vector3 localPositionOffset, Vector3 localEulerOffset)
+        {
+            _extraPos += localPositionOffset;
+            _extraEuler += localEulerOffset;
+        }
+
         private void LateUpdate()
         {
-            if (_strength <= 0f)
+            bool hasExtra = _extraPos != Vector3.zero || _extraEuler != Vector3.zero;
+            if (_strength <= 0f && !hasExtra)
             {
+                if (_dirty)
+                {
+                    transform.localPosition = _baseLocalPos;
+                    transform.localRotation = _baseLocalRot;
+                    _dirty = false;
+                }
                 return;
             }
 
-            float dt = Time.deltaTime;
-            _time += dt;
-            _strength = Mathf.Max(0f, _strength - dt / _duration);
+            Vector3 offset = Vector3.zero;
+            float roll = 0f;
 
-            float s = _strength * globalMultiplier;
-            float s2 = s * s; // квадрат даёт мягкий хвост
-            float n = _time * _frequency;
-
-            // Шум Перлина в диапазоне -1..1
-            float nx = Mathf.PerlinNoise(_seed, n) * 2f - 1f;
-            float ny = Mathf.PerlinNoise(_seed + 17.3f, n) * 2f - 1f;
-            float nr = Mathf.PerlinNoise(_seed + 41.7f, n) * 2f - 1f;
-
-            Vector3 offset;
-            offset.x = (nx + _sideBias * 0.5f) * _posAmp * s2;
-            offset.y = ny * _posAmp * s2;
-            offset.z = -_recoil * Mathf.Min(s, 1f) * Mathf.Min(s, 1f); // отдача назад
-
-            transform.localPosition = _baseLocalPos + offset;
-            transform.localRotation = _baseLocalRot * Quaternion.Euler(0f, 0f, nr * _rollAmp * s2);
-
-            if (_strength <= 0f)
+            if (_strength > 0f)
             {
-                transform.localPosition = _baseLocalPos;
-                transform.localRotation = _baseLocalRot;
+                float dt = Time.deltaTime;
+                _time += dt;
+                _strength = Mathf.Max(0f, _strength - dt / _duration);
+
+                float s = _strength * globalMultiplier;
+                float s2 = s * s; // квадрат даёт мягкий хвост
+                float n = _time * _frequency;
+
+                // Шум Перлина в диапазоне -1..1
+                float nx = Mathf.PerlinNoise(_seed, n) * 2f - 1f;
+                float ny = Mathf.PerlinNoise(_seed + 17.3f, n) * 2f - 1f;
+                float nr = Mathf.PerlinNoise(_seed + 41.7f, n) * 2f - 1f;
+
+                offset.x = (nx + _sideBias * 0.5f) * _posAmp * s2;
+                offset.y = ny * _posAmp * s2;
+                offset.z = -_recoil * Mathf.Min(s, 1f) * Mathf.Min(s, 1f); // отдача назад
+                roll = nr * _rollAmp * s2;
             }
+
+            transform.localPosition = _baseLocalPos + offset + _extraPos;
+            transform.localRotation = _baseLocalRot * Quaternion.Euler(_extraEuler.x, _extraEuler.y, _extraEuler.z + roll);
+            _dirty = true;
+
+            _extraPos = Vector3.zero;
+            _extraEuler = Vector3.zero;
         }
     }
 }

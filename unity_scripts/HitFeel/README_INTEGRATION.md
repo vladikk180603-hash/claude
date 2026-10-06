@@ -107,6 +107,11 @@ Player                      ← HitFeelController, LungeMotion (+ CharacterContr
 
 Hit Stop больше 0.15 с не бывает — это защитный лимит.
 
+## 6.1. Внешние добавки к камере
+
+`CameraShake.AddOffset(Vector3 localPos, Vector3 localEuler)` — добавка на один кадр
+(вызывать из Update каждый кадр). Её использует пакет SwordCombo для покачивания при замахе.
+
 ## 7. Подключение к урону (пример для интегратора)
 
 ```csharp
