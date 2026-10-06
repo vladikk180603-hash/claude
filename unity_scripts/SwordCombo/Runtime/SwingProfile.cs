@@ -43,7 +43,7 @@ namespace EggGame.SwordCombo
         [Tooltip("Множитель рывка игрока вперёд при начале удара (HitFeel LungeMotion).")]
         [Min(0f)] public float lungeMultiplier = 1f;
 
-        [Header("Камера во время замаха (добавка в CameraShake)")]
+        [Header("Камера во время замаха (добавка в SwingCameraSway)")]
         [Tooltip("Наклон камеры (крен) в градусах на пике замаха. + влево, - вправо.")]
         public float cameraRollDeg = 0f;
         [Tooltip("Кивок камеры в градусах на пике замаха (+ вниз).")]

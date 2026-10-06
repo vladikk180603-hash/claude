@@ -15,27 +15,28 @@ Assets/Scripts/SwordCombo/
     ├── ComboHitFeelBridge.cs       — связь с HitFeel: эффекты с множителями + остановка замаха
     ├── ComboDamage.cs              — IDamageable (заглушка), DamageRequest, IDamageRequestSender
     ├── LocalDamageSender.cs        — отправка урона без сети (место подключения своей системы урона)
+    ├── SwingCameraSway.cs          — покачивание камеры при замахе (свой объект, HitFeel не трогает)
     ├── SwordPlaceholder.cs         — меч-заглушка из кубов
     └── TrainingDummy.cs            — манекен для проверки
 ```
-Изменён один файл HitFeel: `HitFeel/Runtime/CameraShake.cs` (добавлен `AddOffset`).
+**Файлы HitFeel не меняются и не заменяются.** Пакет только вызывает публичные методы HitFeel.
 
 ## Установка по шагам
 
-1. Скопируйте папку `SwordCombo` в `Assets/Scripts/`. Замените `Assets/Scripts/HitFeel/Runtime/CameraShake.cs`
-   новой версией из архива. Дождитесь, пока Unity перекомпилирует, в Console не должно быть красных ошибок.
+1. Скопируйте папку `SwordCombo` в `Assets/Scripts/` (папку HitFeel не трогайте). Дождитесь, пока Unity перекомпилирует, в Console не должно быть красных ошибок.
 2. **Профили ударов:** меню **Tools → Egg Game → Sword Combo → Create 3 Swing Profiles**.
    В `Assets/Scripts/SwordCombo/Profiles` появятся `Swing1_LeftToRight`, `Swing2_RightToLeft`, `Swing3_Overhead`
    с готовыми кривыми. (Если пропустить этот шаг, контроллер использует те же 3 удара встроенными.)
 3. **Меч:** в Hierarchy выделите камеру игрока → **Tools → Egg Game → Sword Combo → Create Sword Pivot Under Camera**.
-   Под камерой появится `SwordPivot` с мечом-заглушкой. Near Clip Plane камеры станет 0.05 (иначе меч обрезается).
+   Над камерой появится `SwingSwayRoot` (покачивание), под камерой — `SwordPivot` с мечом-заглушкой. Near Clip Plane камеры станет 0.05 (иначе меч обрезается).
    Иерархия должна получиться такой:
    ```
    Player                       ← SwordComboController, ComboHitFeelBridge, HitFeelController, LungeMotion, LocalDamageSender
-   └── ... CameraShakeRoot      ← CameraShake (из HitFeel)
-           └── Main Camera
-               └── SwordPivot   ← пустой объект «рука»
-                   └── SwordModel_Placeholder
+   └── ... CameraShakeRoot      ← CameraShake (из HitFeel, без изменений)
+           └── SwingSwayRoot    ← SwingCameraSway (новый, покачивание от замаха)
+               └── Main Camera
+                   └── SwordPivot   ← пустой объект «рука»
+                       └── SwordModel_Placeholder
    ```
 4. Выделите **Player** → **Add Component**:
    - `SwordComboController`:
@@ -93,7 +94,9 @@ Package или Both) — используется `Mouse.current.leftButton`, и
 - **Остановка замаха**: `FreezeSwing` ставит локальную скорость замаха `SwingSpeed` в 0 на время hitStop (максимум 0.2 с),
   потом возвращает 1. Нажатия в это время попадают в буфер.
 - **Камера**: контроллер камеру не двигает. Крен/кивок/сдвиг замаха каждый кадр отправляется в
-  `CameraShake.AddOffset(...)`, который складывает их с тряской от попаданий.
+  `SwingCameraSway.AddOffset(...)` на объекте `SwingSwayRoot`. Тряска от попаданий остаётся в HitFeel `CameraShake`
+  на `CameraShakeRoot`. Каждый скрипт двигает только свой объект, поэтому они не мешают друг другу и складываются.
+  Если `SwingSwayRoot` не создавать — всё работает, просто без покачивания при замахе.
 
 ## Настоящая модель меча (когда появится)
 - **Точка хвата = начало координат `SwordPivot`** (место, где кисть сжимает рукоять, сразу под гардой).
@@ -122,6 +125,10 @@ Package или Both) — используется `Mouse.current.leftButton`, и
 
 ## Что должен проверить локальный агент
 1. **Компиляция**: пакет писался без доступа к проекту. Нужен пакет HitFeel (namespace `EggGame.HitFeel`).
+   HitFeel мог быть изменён в проекте — проверить, что остались публичные: `HitFeelController.PlayHit(HitFeelProfile, HitInfo, Animator)`,
+   `PlaySwingStart(HitFeelProfile)`, поля `profile` и `weaponAnimator`, `KnockbackReceiver`, конструктор `HitInfo(5 параметров)`
+   и поля `HitFeelProfile` (hitStopSeconds, knockbackDistance, knockbackUp, shake*, lunge* и т.д.).
+   Если что-то переименовано — поправить в `ComboHitFeelBridge.cs` и `SwordComboController.cs`, НЕ в HitFeel.
    Если в проекте есть `.asmdef`, папкам HitFeel и SwordCombo нужна ссылка на `Unity.InputSystem` (если он используется).
 2. **Путь урона**: в `LocalDamageSender.SendDamageRequest` (место помечено `>>> МЕСТО ПОДКЛЮЧЕНИЯ <<<`)
    заменить заглушку `IDamageable` на существующую систему урона проекта. Для Fusion 2 — написать свой
@@ -129,7 +136,7 @@ Package или Both) — используется `Mouse.current.leftButton`, и
    а хост проверяет дистанцию/кулдаун и наносит урон. Эффекты (`OnImpact`) уже отделены и остаются локальными.
 3. **Ввод**: убедиться, что клик не конфликтует с другим действием на ЛКМ (UI, стрельба, строительство);
    при необходимости выключить *Read Mouse Input* и вызывать `RequestAttack()` из своего ввода.
-4. **Камера**: `CameraShake` стоит на отдельном объекте между игроком и камерой и активен только у локального игрока;
+4. **Камера**: `CameraShake` и `SwingCameraSway` стоят на своих отдельных объектах над камерой и активны только у локального игрока;
    `SwordPivot` — дочерний объект камеры; Near Clip Plane ≈ 0.05.
 5. **Сеть**: у чужих игроков `SwordComboController.isLocalPlayer = false` и `HitFeelController.isLocalPlayer = false`
    (или компоненты выключены), иначе их клики/эффекты сработают у вас.

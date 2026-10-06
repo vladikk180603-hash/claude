@@ -26,7 +26,7 @@ namespace EggGame.SwordCombo.EditorTools
             Selection.activeObject = last;
         }
 
-        // Создаёт SwordPivot с мечом-заглушкой под выделенной камерой (или Main Camera).
+        // Создаёт SwingSwayRoot над камерой и SwordPivot с мечом-заглушкой под камерой.
         [MenuItem("Tools/Egg Game/Sword Combo/Create Sword Pivot Under Camera")]
         public static void CreatePivot()
         {
@@ -37,6 +37,20 @@ namespace EggGame.SwordCombo.EditorTools
             {
                 EditorUtility.DisplayDialog("Sword Combo", "Выделите камеру игрока в Hierarchy и повторите.", "OK");
                 return;
+            }
+
+            // Объект покачивания между камерой и её родителем (CameraShakeRoot). Камера остаётся на месте.
+            if (cam.transform.parent == null || cam.transform.parent.GetComponent<SwingCameraSway>() == null)
+            {
+                GameObject sway = new GameObject("SwingSwayRoot");
+                Undo.RegisterCreatedObjectUndo(sway, "Create SwingSwayRoot");
+                Undo.SetTransformParent(sway.transform, cam.transform.parent, "Create SwingSwayRoot");
+                sway.transform.localPosition = Vector3.zero;
+                sway.transform.localRotation = Quaternion.identity;
+                sway.transform.localScale = Vector3.one;
+                sway.transform.SetSiblingIndex(cam.transform.GetSiblingIndex());
+                Undo.SetTransformParent(cam.transform, sway.transform, "Move Camera Under SwingSwayRoot");
+                Undo.AddComponent<SwingCameraSway>(sway);
             }
 
             GameObject pivot = new GameObject("SwordPivot");

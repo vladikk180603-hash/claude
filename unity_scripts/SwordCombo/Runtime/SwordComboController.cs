@@ -10,7 +10,7 @@ namespace EggGame.SwordCombo
 {
     // Серия из нескольких ударов мечом без анимационных клипов. Ставится на игрока.
     // Двигает только SwordPivot (дочерний объект камеры). Камеру не трогает напрямую —
-    // покачивание отправляет в CameraShake.AddOffset.
+    // покачивание отправляет в SwingCameraSway (отдельный объект, HitFeel не меняется).
     public class SwordComboController : MonoBehaviour
     {
         public enum State { Idle, Swing, Recovery }
@@ -28,8 +28,8 @@ namespace EggGame.SwordCombo
         [Tooltip("Компонент, отправляющий запрос урона (IDamageRequestSender). Если пусто — ищется на игроке.")]
         public MonoBehaviour damageSender;
 
-        [Tooltip("Тряска камеры для покачивания при замахе. Если пусто — CameraShake.Local.")]
-        public CameraShake cameraShake;
+        [Tooltip("Покачивание камеры при замахе. Если пусто — SwingCameraSway.Local. Если его нет — покачивания не будет.")]
+        public SwingCameraSway cameraSway;
 
         [Header("Стойка (поза SwordPivot относительно камеры)")]
         [Tooltip("Где рука с мечом в стойке: X вправо, Y вверх, Z вперёд.")]
@@ -273,8 +273,8 @@ namespace EggGame.SwordCombo
             swordPivot.localPosition = pos;
             swordPivot.localRotation = rot;
 
-            // Покачивание камеры — добавкой в CameraShake (сам контроллер камеру не двигает).
-            CameraShake cs = cameraShake != null ? cameraShake : CameraShake.Local;
+            // Покачивание камеры — добавкой в SwingCameraSway (сам контроллер камеру не двигает).
+            SwingCameraSway cs = cameraSway != null ? cameraSway : SwingCameraSway.Local;
             if (cs != null)
             {
                 float env = SwingProfile.CameraEnvelope(t);
